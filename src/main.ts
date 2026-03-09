@@ -153,4 +153,77 @@ program
     }
   });
 
+// ── source add ───────────────────────────────────────────────────────────
+
+program
+  .command('source-add <url>')
+  .description('Add a new feed source')
+  .option('-t, --type <type>', 'Source type: rss, webpage, newsletter, academic, social, video', 'rss')
+  .option('--title <title>', 'Custom title for the source')
+  .option('-p, --priority <n>', 'Priority 1-5', '3')
+  .action(async (url: string, opts: { type: string; title?: string; priority: string }) => {
+    try {
+      const client = getClient();
+      const result = await client.createSource({
+        url,
+        type: opts.type,
+        title: opts.title,
+        priority: parseInt(opts.priority, 10),
+      });
+
+      if (isJsonMode()) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+
+      if (result.created) {
+        console.log(`✅ Source created (id: ${result.id})`);
+      } else if (result.subscribed) {
+        console.log(`✅ Subscribed to existing source (id: ${result.id})`);
+      } else if (result.restored) {
+        console.log(`✅ Archived source restored (id: ${result.id})`);
+      } else {
+        console.log(`ℹ️  Source already exists (id: ${result.id})`);
+      }
+      console.log(`   ${result.title ?? result.url}`);
+      if (result.type) console.log(`   Type: ${result.type}`);
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+// ── source assign-topic ──────────────────────────────────────────────────
+
+program
+  .command('assign-topic')
+  .description('Assign a feed source to a topic')
+  .requiredOption('--feed-id <id>', 'Feed ID')
+  .requiredOption('--topic-id <id>', 'Topic ID')
+  .option('-s, --source <source>', 'Assignment source: manual, system, inferred', 'manual')
+  .action(async (opts: { feedId: string; topicId: string; source: string }) => {
+    try {
+      const client = getClient();
+      const result = await client.assignFeedTopic({
+        feed_id: parseInt(opts.feedId, 10),
+        topic_id: parseInt(opts.topicId, 10),
+        source: opts.source as 'system' | 'manual' | 'inferred',
+      });
+
+      if (isJsonMode()) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+
+      if (result.created) {
+        console.log(`✅ Feed ${result.feed_id} assigned to topic ${result.topic_id} (source: ${result.source})`);
+      } else {
+        console.log(`ℹ️  Feed ${result.feed_id} already assigned to topic ${result.topic_id}`);
+      }
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
 program.parseAsync(process.argv);

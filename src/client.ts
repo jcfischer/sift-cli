@@ -32,11 +32,53 @@ export interface Source {
   type: string;
 }
 
+export interface CreateSourceParams {
+  url: string;
+  type?: string;
+  title?: string;
+  priority?: number;
+}
+
+export interface CreateSourceResult {
+  id: number;
+  url: string;
+  title?: string;
+  type?: string;
+  created?: boolean;
+  subscribed?: boolean;
+  restored?: boolean;
+  message?: string;
+}
+
+export interface AssignFeedTopicParams {
+  feed_id: number;
+  topic_id: number;
+  source?: 'system' | 'manual' | 'inferred';
+}
+
+export interface AssignFeedTopicResult {
+  feed_id: number;
+  topic_id: number;
+  source: string;
+  created: boolean;
+}
+
+interface JobError {
+  code: string;
+  message: string;
+}
+
 interface JobResponse {
   job_id: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   data?: unknown;
-  error?: string;
+  error?: string | JobError;
+}
+
+function formatJobError(err: string | JobError | undefined): string {
+  if (!err) return 'unknown error';
+  if (typeof err === 'string') return err;
+  return err.message ?? err.code ?? JSON.stringify(err);
 }
 
 export class SiftClient {
@@ -75,7 +117,7 @@ export class SiftClient {
       const job = await this.request<JobResponse>('GET', `/jobs/${jobId}`);
 
       if (job.status === 'completed') return job.data;
-      if (job.status === 'failed') throw new Error(`Job failed: ${job.error ?? 'unknown error'}`);
+      if (job.status === 'failed') throw new Error(`Job failed: ${formatJobError(job.error)}`);
 
       await new Promise((r) => setTimeout(r, delayMs));
       delayMs = Math.min(delayMs * 1.5, 5000);
@@ -122,6 +164,26 @@ export class SiftClient {
 
     const data = await this.pollUntilDone(job.job_id) as { topics?: Topic[] };
     return data?.topics ?? [];
+  }
+
+  async createSource(params: CreateSourceParams): Promise<CreateSourceResult> {
+    const job = await this.request<JobResponse>('POST', '/jobs', {
+      operation: 'sources',
+      params: { action: 'create', ...params },
+    });
+
+    if (job.status === 'completed') return job.data as CreateSourceResult;
+    return await this.pollUntilDone(job.job_id) as CreateSourceResult;
+  }
+
+  async assignFeedTopic(params: AssignFeedTopicParams): Promise<AssignFeedTopicResult> {
+    const job = await this.request<JobResponse>('POST', '/jobs', {
+      operation: 'topics',
+      params: { action: 'assign', ...params },
+    });
+
+    if (job.status === 'completed') return job.data as AssignFeedTopicResult;
+    return await this.pollUntilDone(job.job_id) as AssignFeedTopicResult;
   }
 
   async sources(params?: { limit?: number; cursor?: string }): Promise<Source[]> {
