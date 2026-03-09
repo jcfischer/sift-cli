@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.local
+*.token.json
+# Token cache (contains sensitive JWT tokens)
+~/.config/sift/token.json
+# Compiled binary
+sift
