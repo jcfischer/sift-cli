@@ -44,12 +44,6 @@ sift topics --json
 
 Returns all research topics with article and feed counts.
 
-### Create a topic
-
-```bash
-sift topic-create "<name>" --description "<description>" --json
-```
-
 ### List sources
 
 ```bash
@@ -76,7 +70,7 @@ sift assign-topic --feed-id <id> --topic-id <id> --json
 - For broad research questions, use `sift ask` with `--mode deep`
 - For finding specific articles, use `sift search` with targeted queries
 - Check `sift topics --json` first to see what research areas are available
-- When the user asks to monitor a new area, create a topic with `topic-create` and add sources with `source-add`
+- When the user asks to monitor a new area, add sources with `source-add` (topic creation requires super admin access via the web UI)
 
 ## Example workflow
 
@@ -90,9 +84,7 @@ sift search "supply chain attacks 2026" --json --limit 5
 # 3. Ask a synthesized question
 sift ask "What are the most significant supply chain attacks this year?" --json
 
-# 4. Add a new source the user mentioned
+# 4. Add a new source and assign it to a topic
 sift source-add "https://security.blog/feed.xml" --type rss --json
-
-# 5. Assign it to a topic
 sift assign-topic --feed-id 42 --topic-id 3 --json
 ```

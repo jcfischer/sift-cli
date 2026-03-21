@@ -107,7 +107,7 @@ Options:
 - `--scope <scope>` — Filter: `system` or `tenant`
 - `-n, --limit <n>` — Maximum results (default: 50)
 
-### `sift topic-create <name>`
+### `sift topic-create <name>` (super admin only)
 
 Create a new topic.
 
