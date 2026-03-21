@@ -1,8 +1,10 @@
-# sift
+# sift-cli
 
-A CLI for the [Sift](https://getsift.ch) AI search and Q&A API.
+A CLI for [Sift](https://getsift.ch) — AI-powered research intelligence.
 
-Search your article corpus, ask questions answered from curated sources, and browse topics and feeds — all from the terminal.
+Search your article corpus, ask questions answered from curated sources, and manage topics and feeds from the terminal or through an AI agent.
+
+**Repository:** [github.com/jcfischer/sift-cli](https://github.com/jcfischer/sift-cli)
 
 ## Installation
 
@@ -10,11 +12,11 @@ Search your article corpus, ask questions answered from curated sources, and bro
 
 - [Bun](https://bun.sh) runtime
 
-### Build from source
+### Install from source
 
 ```bash
-git clone https://github.com/your-username/sift
-cd sift
+git clone https://github.com/jcfischer/sift-cli.git
+cd sift-cli
 bun install
 bun run build
 ```
@@ -27,9 +29,19 @@ This compiles a self-contained binary to `~/bin/sift`. Make sure `~/bin` is in y
 bun run src/main.ts <command>
 ```
 
+## Agent integration
+
+Sift is designed to be used by AI coding agents (Claude Code, Cursor, etc.) as a research tool. To add Sift as a skill for your agent:
+
+1. Copy `SKILL.md` from this repository into your agent's skill directory (e.g. `~/.claude/skills/sift/SKILL.md` for Claude Code)
+2. Set the required environment variables (see Configuration below)
+3. Your agent can now search articles, ask research questions, and manage topics via the `sift` CLI
+
+See [SKILL.md](SKILL.md) for the full skill definition.
+
 ## Configuration
 
-Set credentials via environment variables (recommended):
+Set credentials via environment variables:
 
 ```bash
 export SIFT_CLIENT_ID=your_client_id
@@ -45,9 +57,9 @@ Or create `~/.config/sift/config.json`:
 }
 ```
 
-Tokens are automatically obtained via OAuth2 Client Credentials flow and cached at `~/.config/sift/token.json` (refreshed 60 seconds before expiry).
+Tokens are obtained via OAuth2 Client Credentials flow and cached at `~/.config/sift/token.json` (refreshed 60 seconds before expiry).
 
-### Optional environment variables
+### Environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -95,6 +107,17 @@ Options:
 - `--scope <scope>` — Filter: `system` or `tenant`
 - `-n, --limit <n>` — Maximum results (default: 50)
 
+### `sift topic-create <name>`
+
+Create a new topic.
+
+```bash
+sift topic-create "Kubernetes Security" --description "CVEs and hardening guides for k8s"
+```
+
+Options:
+- `-d, --description <text>` — Topic description
+
 ### `sift sources`
 
 List feed sources.
@@ -107,11 +130,38 @@ sift sources --limit 100
 Options:
 - `-n, --limit <n>` — Maximum results (default: 25)
 
+### `sift source-add <url>`
+
+Add a new feed source.
+
+```bash
+sift source-add https://example.com/feed.xml
+sift source-add https://example.com --type webpage --title "Example Blog"
+```
+
+Options:
+- `-t, --type <type>` — Source type: `rss`, `webpage`, `newsletter`, `academic`, `social`, `video` (default: `rss`)
+- `--title <title>` — Custom title
+- `-p, --priority <n>` — Priority 1-5 (default: 3)
+
+### `sift assign-topic`
+
+Assign a feed source to a topic.
+
+```bash
+sift assign-topic --feed-id 42 --topic-id 7
+```
+
+Options:
+- `--feed-id <id>` — Feed ID (required)
+- `--topic-id <id>` — Topic ID (required)
+- `-s, --source <source>` — Assignment source: `manual`, `system`, `inferred` (default: `manual`)
+
 ## Global flags
 
 | Flag | Description |
 |------|-------------|
-| `--json` | Output results as JSON (for scripting) |
+| `--json` | Output results as JSON (for scripting and agents) |
 | `--version` | Show version |
 | `--help` | Show help |
 
@@ -126,6 +176,10 @@ sift ask "What is Hono?" --json | jq '.answer'
 
 # List topics in JSON format
 sift topics --json | jq '.[].name'
+
+# Add a source and assign it to a topic
+sift source-add https://blog.example.com/feed.xml
+sift assign-topic --feed-id 42 --topic-id 3
 ```
 
 ## License
