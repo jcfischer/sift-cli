@@ -50,6 +50,20 @@ export interface CreateSourceResult {
   message?: string;
 }
 
+export interface CreateTopicParams {
+  name: string;
+  description?: string;
+}
+
+export interface CreateTopicResult {
+  id: number;
+  name: string;
+  slug: string;
+  scope: string;
+  description?: string;
+  created: boolean;
+}
+
 export interface AssignFeedTopicParams {
   feed_id: number;
   topic_id: number;
@@ -164,6 +178,16 @@ export class SiftClient {
 
     const data = await this.pollUntilDone(job.job_id) as { topics?: Topic[] };
     return data?.topics ?? [];
+  }
+
+  async createTopic(params: CreateTopicParams): Promise<CreateTopicResult> {
+    const job = await this.request<JobResponse>('POST', '/jobs', {
+      operation: 'topics',
+      params: { action: 'create', ...params },
+    });
+
+    if (job.status === 'completed') return job.data as CreateTopicResult;
+    return await this.pollUntilDone(job.job_id) as CreateTopicResult;
   }
 
   async createSource(params: CreateSourceParams): Promise<CreateSourceResult> {

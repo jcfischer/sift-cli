@@ -122,6 +122,34 @@ program
     }
   });
 
+// ── topic create ─────────────────────────────────────────────────────────
+
+program
+  .command('topic-create <name>')
+  .description('Create a new topic')
+  .option('-d, --description <description>', 'Topic description')
+  .action(async (name: string, opts: { description?: string }) => {
+    try {
+      const client = getClient();
+      const result = await client.createTopic({
+        name,
+        description: opts.description,
+      });
+
+      if (isJsonMode()) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+
+      console.log(`✅ Topic created (id: ${result.id})`);
+      console.log(`   ${result.name} [${result.slug}]`);
+      if (result.description) console.log(`   ${result.description}`);
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
 // ── sources ───────────────────────────────────────────────────────────────
 
 program
