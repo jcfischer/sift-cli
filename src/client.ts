@@ -245,4 +245,40 @@ export class SiftClient {
 
     return allSources;
   }
+
+  async catalog(params?: { limit?: number; offset?: number }): Promise<{ sources: Source[]; hasMore: boolean; cursor?: string }> {
+    const cursor = params?.offset ? Buffer.from(JSON.stringify({ offset: params.offset })).toString('base64') : undefined;
+    const job = await this.request<JobResponse>('POST', '/jobs', {
+      operation: 'sources',
+      params: { action: 'catalog', limit: params?.limit, cursor },
+    });
+
+    let data: { sources?: Source[]; has_more?: boolean; cursor?: string };
+    if (job.status === 'completed') {
+      data = job.data as typeof data;
+    } else {
+      data = await this.pollUntilDone(job.job_id) as typeof data;
+    }
+
+    return {
+      sources: data?.sources ?? [],
+      hasMore: data?.has_more ?? false,
+      cursor: data?.cursor,
+    };
+  }
+
+  async allCatalog(params?: { limit?: number }): Promise<Source[]> {
+    const pageSize = params?.limit ?? 100;
+    const all: Source[] = [];
+    let offset = 0;
+
+    while (true) {
+      const page = await this.catalog({ limit: pageSize, offset });
+      all.push(...page.sources);
+      if (!page.hasMore) break;
+      offset += pageSize;
+    }
+
+    return all;
+  }
 }

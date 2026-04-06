@@ -200,6 +200,56 @@ program
     }
   });
 
+// ── catalog ──────────────────────────────────────────────────────────────
+
+program
+  .command('catalog')
+  .description('List all feed catalog sources (not just tenant subscriptions)')
+  .option('-n, --limit <n>', 'Maximum results per page', '100')
+  .option('--offset <n>', 'Skip first N results')
+  .option('-a, --all', 'Fetch all catalog sources (auto-paginate)')
+  .action(async (opts: { limit: string; offset?: string; all?: boolean }) => {
+    try {
+      const client = getClient();
+      const limit = parseInt(opts.limit, 10);
+
+      let sources;
+      if (opts.all) {
+        sources = await client.allCatalog({ limit: Math.min(limit, 100) });
+      } else {
+        const offset = opts.offset ? parseInt(opts.offset, 10) : undefined;
+        const page = await client.catalog({ limit, offset });
+        sources = page.sources;
+
+        if (!isJsonMode() && page.hasMore) {
+          console.log(`Showing ${sources.length} of more results. Use --all to fetch all, or --offset ${(offset ?? 0) + limit} for next page.\n`);
+        }
+      }
+
+      if (isJsonMode()) {
+        console.log(JSON.stringify(sources, null, 2));
+        return;
+      }
+
+      if (sources.length === 0) {
+        console.log('No catalog sources found.');
+        return;
+      }
+
+      for (const s of sources) {
+        console.log(`  [${s.type}] ${s.title ?? s.url}`);
+        if (s.title) console.log(`         ${s.url}`);
+      }
+
+      if (opts.all) {
+        console.log(`\nTotal: ${sources.length} catalog sources`);
+      }
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
 // ── source add ───────────────────────────────────────────────────────────
 
 program
