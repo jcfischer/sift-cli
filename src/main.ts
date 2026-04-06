@@ -155,11 +155,26 @@ program
 program
   .command('sources')
   .description('List feed sources')
-  .option('-n, --limit <n>', 'Maximum results', '25')
-  .action(async (opts: { limit: string }) => {
+  .option('-n, --limit <n>', 'Maximum results per page', '25')
+  .option('--offset <n>', 'Skip first N results')
+  .option('-a, --all', 'Fetch all sources (auto-paginate)')
+  .action(async (opts: { limit: string; offset?: string; all?: boolean }) => {
     try {
       const client = getClient();
-      const sources = await client.sources({ limit: parseInt(opts.limit, 10) });
+      const limit = parseInt(opts.limit, 10);
+
+      let sources;
+      if (opts.all) {
+        sources = await client.allSources({ limit: Math.min(limit, 100) });
+      } else {
+        const offset = opts.offset ? parseInt(opts.offset, 10) : undefined;
+        const page = await client.sources({ limit, offset });
+        sources = page.sources;
+
+        if (!isJsonMode() && page.hasMore) {
+          console.log(`Showing ${sources.length} of more results. Use --all to fetch all, or --offset ${(offset ?? 0) + limit} for next page.\n`);
+        }
+      }
 
       if (isJsonMode()) {
         console.log(JSON.stringify(sources, null, 2));
@@ -174,6 +189,10 @@ program
       for (const s of sources) {
         console.log(`  [${s.type}] ${s.title ?? s.url}`);
         if (s.title) console.log(`         ${s.url}`);
+      }
+
+      if (opts.all) {
+        console.log(`\nTotal: ${sources.length} sources`);
       }
     } catch (err) {
       console.error(`Error: ${(err as Error).message}`);

@@ -210,18 +210,39 @@ export class SiftClient {
     return await this.pollUntilDone(job.job_id) as AssignFeedTopicResult;
   }
 
-  async sources(params?: { limit?: number; cursor?: string }): Promise<Source[]> {
+  async sources(params?: { limit?: number; offset?: number }): Promise<{ sources: Source[]; hasMore: boolean; cursor?: string }> {
+    const cursor = params?.offset ? Buffer.from(JSON.stringify({ offset: params.offset })).toString('base64') : undefined;
     const job = await this.request<JobResponse>('POST', '/jobs', {
       operation: 'sources',
-      params: params ?? {},
+      params: { limit: params?.limit, cursor },
     });
 
+    let data: { sources?: Source[]; has_more?: boolean; cursor?: string };
     if (job.status === 'completed') {
-      const data = job.data as { sources?: Source[] };
-      return data?.sources ?? [];
+      data = job.data as typeof data;
+    } else {
+      data = await this.pollUntilDone(job.job_id) as typeof data;
     }
 
-    const data = await this.pollUntilDone(job.job_id) as { sources?: Source[] };
-    return data?.sources ?? [];
+    return {
+      sources: data?.sources ?? [],
+      hasMore: data?.has_more ?? false,
+      cursor: data?.cursor,
+    };
+  }
+
+  async allSources(params?: { limit?: number }): Promise<Source[]> {
+    const pageSize = params?.limit ?? 100;
+    const allSources: Source[] = [];
+    let offset = 0;
+
+    while (true) {
+      const page = await this.sources({ limit: pageSize, offset });
+      allSources.push(...page.sources);
+      if (!page.hasMore) break;
+      offset += pageSize;
+    }
+
+    return allSources;
   }
 }
