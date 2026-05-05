@@ -41,12 +41,19 @@ program
   .option('-n, --limit <n>', 'Maximum results to return', '10')
   .option('--since <duration>', 'Filter to articles published within duration (e.g. 7d, 4w, 3m)')
   .option('--topic <topic>', 'Filter by topic name or ID')
-  .action(async (query: string, opts: { limit: string; since?: string; topic?: string }) => {
+  .option('--semantic', 'Use hybrid search (30% keyword + 70% semantic embeddings). Requires --topic')
+  .action(async (query: string, opts: { limit: string; since?: string; topic?: string; semantic?: boolean }) => {
     const limit = parseInt(opts.limit, 10);
     try {
       const client = getClient();
 
-      const searchOpts: { since?: string; topicId?: number } = {};
+      if (opts.semantic && !opts.topic) {
+        console.error('--semantic requires --topic (backend needs a topic scope for embedding search)');
+        process.exit(1);
+      }
+
+      const searchOpts: { since?: string; topicId?: number; mode?: 'keyword' | 'hybrid' } = {};
+      if (opts.semantic) searchOpts.mode = 'hybrid';
       if (opts.since) searchOpts.since = parseSince(opts.since);
       if (opts.topic) {
         const asNum = Number(opts.topic);
@@ -80,6 +87,7 @@ program
       for (const r of results) {
         console.log(`\n📰 ${r.title}`);
         if (r.published_at) console.log(`   📅 ${new Date(r.published_at).toLocaleDateString()}`);
+        if (r.relevance_score) console.log(`   📊 relevance: ${(r.relevance_score * 100).toFixed(1)}%`);
         if (r.snippet) console.log(`   ${r.snippet.replace(/<[^>]+>/g, '').slice(0, 120)}…`);
         console.log(`   🔗 ${r.url}`);
       }
