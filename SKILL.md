@@ -27,19 +27,19 @@ Search, question, and manage an AI-curated article corpus via the `sift` CLI. Op
 sift search "<query>" --json --limit 10
 sift search "<query>" --since 7d --json
 sift search "<query>" --topic Security --json
-sift search "<query>" --semantic --topic AI --json
-sift search "<query>" --semantic --topic AI --since 30d --limit 5 --json
+sift search "<query>" --hybrid --topic AI --json
+sift search "<query>" --hybrid --topic AI --since 30d --limit 5 --json
 ```
 
 Returns matching articles with title, URL, snippet, and publication date. Use `--json` for structured output you can parse.
 
 Options:
-- `--semantic` — Use hybrid search (30% keyword + 70% semantic embeddings). Returns `relevance_score` with composite scores. Requires `--topic`.
+- `--hybrid` — Use hybrid search (30% keyword + 70% semantic embeddings). Returns `relevance_score` with composite scores. Requires `--topic`.
 - `--since <duration>` — Filter to articles published within duration. Formats: `7d` (days), `4w` (weeks), `3m` (months).
 - `--topic <name-or-id>` — Filter by topic name (prefix-matched, case-insensitive) or numeric topic ID.
 - `-n, --limit <n>` — Maximum results (default: 10).
 
-**When to use `--semantic`:** For natural-language queries where keyword matching is too noisy. "best practices for running local LLMs" with `--semantic` returns articles about local LLM deployment; without it, returns anything containing "best", "LLM", or "local".
+**When to use `--hybrid`:** For natural-language queries where keyword matching is too noisy. "best practices for running local LLMs" with `--hybrid` returns articles about local LLM deployment; without it, returns anything containing "best", "LLM", or "local".
 
 ### Ask a research question
 
@@ -162,8 +162,8 @@ Triggers: "sync sift", "run sift queries", "update my research", "sync sift to t
    e. For each new article (URL not already in children):
       import_tana_paste into queryNodeId:
         - <title> #[[^article-tag-id]]
-          - [[^urlFieldId]]:: [<title>](<url>)
-          - [[^summaryFieldId]]:: <snippet, cleaned of HTML marks>
+          - [[^urlFieldId]]:: [<url>](<url>)
+          - [[^summaryFieldId]]:: <description if available, else snippet cleaned of HTML marks>
       Then set_field_content for date field (Tana Paste doesn't handle dates):
         - set_field_content(nodeId, publishedFieldId, <YYYY-MM-DD>)
       
