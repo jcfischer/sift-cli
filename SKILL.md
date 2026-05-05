@@ -27,15 +27,19 @@ Search, question, and manage an AI-curated article corpus via the `sift` CLI. Op
 sift search "<query>" --json --limit 10
 sift search "<query>" --since 7d --json
 sift search "<query>" --topic Security --json
-sift search "<query>" --since 30d --topic AI --limit 5 --json
+sift search "<query>" --semantic --topic AI --json
+sift search "<query>" --semantic --topic AI --since 30d --limit 5 --json
 ```
 
 Returns matching articles with title, URL, snippet, and publication date. Use `--json` for structured output you can parse.
 
 Options:
+- `--semantic` — Use hybrid search (30% keyword + 70% semantic embeddings). Returns `relevance_score` with composite scores. Requires `--topic`.
 - `--since <duration>` — Filter to articles published within duration. Formats: `7d` (days), `4w` (weeks), `3m` (months).
 - `--topic <name-or-id>` — Filter by topic name (prefix-matched, case-insensitive) or numeric topic ID.
 - `-n, --limit <n>` — Maximum results (default: 10).
+
+**When to use `--semantic`:** For natural-language queries where keyword matching is too noisy. "best practices for running local LLMs" with `--semantic` returns articles about local LLM deployment; without it, returns anything containing "best", "LLM", or "local".
 
 ### Ask a research question
 
@@ -115,7 +119,7 @@ On first use, ask the user two things:
 ```
 1. list_tags → search for "sift-query"
 2. If missing, create sift-query tag with fields:
-   - Query (plain), Frequency (options: daily/weekly/on-demand), Last run (date), Max results (number, default 5)
+   - Query (plain), Topic (plain — Sift topic name to filter by), Frequency (options: daily/weekly/on-demand), Last run (date), Max results (number, default 5)
 3. Ask user about article tag preference:
    - "I can create a #sift-article tag, or use your existing article/bookmark tag. Which do you prefer?"
    - If existing: get_tag_schema → map fields → store mapping
@@ -146,27 +150,32 @@ Triggers: "sync sift", "run sift queries", "update my research", "sync sift to t
 
 1. search_nodes({ hasType: "<sift-query-tag-id>" }) → get all query nodes
 2. For each query node:
-   a. read_node(queryNodeId) → get Query field value (fallback: node name), Max results
-   b. sift ask "<query>" --json
-   c. Check answer_confidence — skip import if < 0.5 (corpus doesn't cover this topic well)
-   d. Extract citations array from response
-   e. Filter citations: drop articles older than 90 days
-   f. get_children(queryNodeId) → existing articles (for dedup by URL)
-   g. For each new citation (URL not already in children):
+   a. read_node(queryNodeId) → get Query field value (fallback: node name), Max results, Topic, Frequency
+   b. Build search command:
+      - Base: sift search "<query>" --json --limit <max>
+      - If Topic field set: add --topic "<topic>"
+      - If Frequency is "daily": add --since 1d
+      - If Frequency is "weekly": add --since 7d
+      - If Frequency is "on-demand" or unset: add --since 30d (default)
+   c. Run: sift search "<query>" --since <duration> --topic <topic> --json --limit <max>
+   d. get_children(queryNodeId) → existing articles (for dedup by URL)
+   e. For each new article (URL not already in children):
       import_tana_paste into queryNodeId:
         - <title> #[[^article-tag-id]]
-          - [[^urlFieldId]]:: <url>
-          - [[^summaryFieldId]]:: <AI-generated answer excerpt relevant to this citation>
-          - Published:: <date>
-   h. set_field_content(queryNodeId, lastRunFieldId, today's date)
-3. Report: "Updated N queries, imported M new articles, skipped K duplicates, K low-confidence queries"
+          - [[^urlFieldId]]:: [<title>](<url>)
+          - [[^summaryFieldId]]:: <snippet, cleaned of HTML marks>
+      Then set_field_content for date field (Tana Paste doesn't handle dates):
+        - set_field_content(nodeId, publishedFieldId, <YYYY-MM-DD>)
+      
+      **URL field pattern:** Must use `[Label](https://url)` markdown syntax in Tana Paste.
+      Bare URLs or set_field_content produce plain text, not clickable links.
+   f. set_field_content(queryNodeId, lastRunFieldId, today's date)
+3. Report: "Updated N queries, imported M new articles, skipped K duplicates"
 ```
 
-**Why `sift ask` instead of `sift search`:**
-- `ask` returns AI-synthesized answers with relevance-scored citations
-- `search` is keyword-matching — returns noisy, often irrelevant results
-- `ask` includes `answer_confidence` (0-1) — natural quality gate
-- Tradeoff: `ask` is slower and costs API tokens, but quality is dramatically better
+**Search strategy:** Uses `sift search` with `--since` and `--topic` flags for filtered, relevant results. The `--since` duration derives from the Frequency field: daily=1d, weekly=7d, on-demand=30d. The `--topic` flag filters to the Sift topic specified in the query node, preventing cross-topic noise.
+
+**Fallback to `sift ask`:** If `sift search` returns 0 results for a query, optionally fall back to `sift ask "<query>" --json` for AI-synthesized results with citations. Only import citations with `relevance_score > 0.4`. This is slower but finds results that keyword search misses.
 
 ### Creating a query node
 
@@ -176,6 +185,7 @@ User says "track AI security in Tana" or "create a sift query for supply chain a
 import_tana_paste into user's chosen parent node:
 - AI Security Research #[[^sift-query-tag-id]]
   - [[^queryFieldId]]:: AI security threats 2026
+  - [[^topicFieldId]]:: Security
   - [[^frequencyFieldId]]:: weekly
   - [[^maxResultsFieldId]]:: 5
 ```

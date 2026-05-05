@@ -9,6 +9,7 @@ export interface SearchResult {
   published_at?: string;
   search_rank?: number;
   quality_score?: number;
+  relevance_score?: number;
 }
 
 export interface AskResult {
@@ -140,10 +141,11 @@ export class SiftClient {
     throw new Error(`Job ${jobId} timed out after ${timeoutMs}ms`);
   }
 
-  async search(query: string, limit = 10, opts?: { since?: string; topicId?: number }): Promise<SearchResult[]> {
+  async search(query: string, limit = 10, opts?: { since?: string; topicId?: number; mode?: 'keyword' | 'hybrid' }): Promise<SearchResult[]> {
     const params: Record<string, unknown> = { query, limit };
     if (opts?.since) params.since = opts.since;
     if (opts?.topicId !== undefined) params.topic_id = opts.topicId;
+    if (opts?.mode) params.mode = opts.mode;
 
     const job = await this.request<JobResponse>('POST', '/jobs', {
       operation: 'search',
