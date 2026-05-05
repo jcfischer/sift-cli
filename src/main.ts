@@ -49,8 +49,8 @@ program
       const searchOpts: { since?: string; topicId?: number } = {};
       if (opts.since) searchOpts.since = parseSince(opts.since);
       if (opts.topic) {
-        const asNum = parseInt(opts.topic, 10);
-        if (!isNaN(asNum)) {
+        const asNum = Number(opts.topic);
+        if (!isNaN(asNum) && String(asNum) === opts.topic) {
           searchOpts.topicId = asNum;
         } else {
           const topics = await client.topics();
