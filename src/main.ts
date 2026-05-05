@@ -11,6 +11,18 @@ program
   .version('0.1.0')
   .option('--json', 'Output results as JSON');
 
+function parseSince(value: string): string {
+  const match = value.match(/^(\d+)([dwm])$/);
+  if (!match) throw new Error(`Invalid --since format "${value}". Use e.g. 7d, 4w, 3m`);
+  const [, n, unit] = match;
+  const now = new Date();
+  const amount = parseInt(n, 10);
+  if (unit === 'd') now.setDate(now.getDate() - amount);
+  else if (unit === 'w') now.setDate(now.getDate() - amount * 7);
+  else if (unit === 'm') now.setMonth(now.getMonth() - amount);
+  return now.toISOString();
+}
+
 // Lazy client factory — only instantiated when a real command runs
 function getClient(): SiftClient {
   const config = loadConfig();
@@ -27,11 +39,33 @@ program
   .command('search <query>')
   .description('Search articles for a query')
   .option('-n, --limit <n>', 'Maximum results to return', '10')
-  .action(async (query: string, opts: { limit: string }) => {
+  .option('--since <duration>', 'Filter to articles published within duration (e.g. 7d, 4w, 3m)')
+  .option('--topic <topic>', 'Filter by topic name or ID')
+  .action(async (query: string, opts: { limit: string; since?: string; topic?: string }) => {
     const limit = parseInt(opts.limit, 10);
     try {
       const client = getClient();
-      const results = await client.search(query, limit);
+
+      const searchOpts: { since?: string; topicId?: number } = {};
+      if (opts.since) searchOpts.since = parseSince(opts.since);
+      if (opts.topic) {
+        const asNum = Number(opts.topic);
+        if (!isNaN(asNum) && String(asNum) === opts.topic) {
+          searchOpts.topicId = asNum;
+        } else {
+          const topics = await client.topics();
+          const needle = opts.topic!.toLowerCase();
+          const match = topics.find(t => t.name.toLowerCase() === needle)
+            ?? topics.find(t => t.name.toLowerCase().startsWith(needle));
+          if (!match) {
+            console.error(`Topic "${opts.topic}" not found. Available: ${topics.map(t => t.name).join(', ')}`);
+            process.exit(1);
+          }
+          searchOpts.topicId = match.id;
+        }
+      }
+
+      const results = await client.search(query, limit, searchOpts);
 
       if (isJsonMode()) {
         console.log(JSON.stringify(results, null, 2));
